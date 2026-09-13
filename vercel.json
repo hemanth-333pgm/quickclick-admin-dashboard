@@ -1,11 +1,12 @@
 {
-  "functions": {
-    "api/**/*.js": {
-      "memory": 512,
-      "maxDuration": 30
-    }
-  },
   "rewrites": [
-    { "source": "/((?!api/).*)", "destination": "/index.html" }
+    {
+      "source": "/api/:path*",
+      "destination": "https://quickclick-backend-136h.onrender.com/api/:path*"
+    },
+    {
+      "source": "/((?!api/).*)",
+      "destination": "/index.html"
+    }
   ]
 }
