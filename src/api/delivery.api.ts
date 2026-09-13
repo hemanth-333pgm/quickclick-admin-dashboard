@@ -6,6 +6,5 @@ export const adminDeliveryApi = {
   getOne: (id: string) => axiosClient.get('/admin/delivery-partners/' + id),
   updateStatus: (id: string, status: 'APPROVED' | 'REJECTED' | 'SUSPENDED') =>
     axiosClient.patch('/admin/delivery-partners/' + id + '/status', { status }),
-  jobs: (id: string) =>
-    axiosClient.get('/admin/orders', { params: { deliveryPartnerId: id, limit: 100 } }),
+  jobs: () => axiosClient.get('/admin/orders', { params: { limit: 500 } }),
 };

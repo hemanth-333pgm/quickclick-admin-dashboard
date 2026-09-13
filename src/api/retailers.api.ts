@@ -11,6 +11,5 @@ export const adminRetailersApi = {
   ) => axiosClient.patch('/admin/retailers/' + id + '/status', { status, remarks }),
   products: (id: string) =>
     axiosClient.get('/products', { params: { retailerId: id, limit: 100 } }),
-  orders: (id: string) =>
-    axiosClient.get('/admin/orders', { params: { retailerId: id, limit: 100 } }),
+  orders: () => axiosClient.get('/admin/orders', { params: { limit: 500 } }),
 };

@@ -16,15 +16,20 @@ const extractList = (data: any): any[] => {
   return [];
 };
 
-// Check EVERY field name for a user reference — whatever the running server sends, we catch it.
+// Extract the customer id from an order. The backend returns userId as a
+// populated object `{ _id, name, mobile }`, but we also handle plain strings
+// and every alternative field name.
 const orderUserId = (o: any): string | undefined => {
   if (!o || typeof o !== 'object') return undefined;
-  const direct =
-    o.userId || o.user_id || o.customerId || o.customer_id ||
-    o.user || o.customer || o.placedBy || o.buyerId || o.buyer;
-  if (!direct) return undefined;
-  if (typeof direct === 'string') return direct;
-  if (typeof direct === 'object') return direct._id || direct.id || undefined;
+  const candidates = [o.userId, o.user_id, o.customerId, o.customer_id, o.user, o.customer, o.placedBy, o.buyerId, o.buyer];
+  for (const c of candidates) {
+    if (!c) continue;
+    if (typeof c === 'string') return c;
+    if (typeof c === 'object') {
+      const id = c._id || c.id;
+      if (id) return String(id);
+    }
+  }
   return undefined;
 };
 
@@ -112,13 +117,12 @@ const CustomerDetail: React.FC = () => {
 
       <Section title={'Orders (' + orders.length + ')'}>
         {showWarning && (
-          <div style={{ padding: 12, background: '#fef3c7', color: '#92400e', borderRadius: 6, fontSize: 12, marginBottom: 12, lineHeight: 1.5 }}>
-            ⚠ <strong>Showing all orders — backend does not link orders to customers.</strong><br />
-            The running server does not return any user reference on order objects, and its <code>/admin/orders</code> endpoint does not support a <code>?userId=</code> filter.
+          <div style={{ padding: 12, background: '#fef3c7', color: '#92400e', borderRadius: 6, fontSize: 12, marginBottom: 12 }}>
+            ⚠ Could not match orders to this customer — showing all orders.
           </div>
         )}
         {orders.length === 0 ? (
-          <div style={{ color: '#9ca3af', padding: 16, textAlign: 'center' }}>No orders</div>
+          <div style={{ color: '#9ca3af', padding: 16, textAlign: 'center' }}>No orders yet</div>
         ) : (
           <table width="100%" cellPadding={8} style={{ fontSize: 13 }}>
             <thead style={{ background: '#f3f4f6', textAlign: 'left', fontSize: 11 }}>

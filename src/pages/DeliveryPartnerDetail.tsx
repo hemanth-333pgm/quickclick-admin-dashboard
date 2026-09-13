@@ -9,11 +9,18 @@ import toast from 'react-hot-toast';
 const extractList = (data: any): any[] => {
   if (Array.isArray(data)) return data;
   if (!data || typeof data !== 'object') return [];
-  for (const key of ['jobs', 'orders', 'results', 'items', 'list']) {
-    if (Array.isArray(data[key])) return data[key];
+  for (const k of ['jobs','orders','results','items','list']) {
+    if (Array.isArray(data[k])) return data[k];
   }
   for (const v of Object.values(data)) if (Array.isArray(v)) return v as any[];
   return [];
+};
+
+const refId = (v: any): string | undefined => {
+  if (!v) return undefined;
+  if (typeof v === 'string') return v;
+  if (typeof v === 'object') return v._id || v.id;
+  return undefined;
 };
 
 const DeliveryPartnerDetail: React.FC = () => {
@@ -29,10 +36,17 @@ const DeliveryPartnerDetail: React.FC = () => {
       try {
         const [pRes, jRes] = await Promise.all([
           adminDeliveryApi.getOne(id).catch(() => null),
-          adminDeliveryApi.jobs(id).catch(() => null),
+          adminDeliveryApi.jobs().catch(() => null),
         ]);
-        if (pRes) setPartner(pRes.data.data);
-        if (jRes) setJobs(extractList(jRes.data.data));
+        if (pRes) setPartner((pRes.data as any).data);
+        if (jRes) {
+          const all = extractList((jRes.data as any).data);
+          const mine = all.filter((o) => {
+            const pid = refId(o.deliveryPartnerId) || refId(o.deliveryPartner) || refId(o.assignment?.deliveryPartnerId);
+            return pid ? pid === String(id) : false;
+          });
+          setJobs(mine);
+        }
       } catch (e) { toast.error(getErrorMessage(e)); } finally { setLoading(false); }
     })();
   }, [id]);
@@ -44,21 +58,19 @@ const DeliveryPartnerDetail: React.FC = () => {
   const active = jobs.filter((j) => ['ASSIGNED', 'PICKED_UP', 'OUT_FOR_DELIVERY'].indexOf(j.status) !== -1).length;
   const earnings = jobs.filter((j) => j.status === 'DELIVERED').reduce((s, j) => s + (j.deliveryFee || 40), 0);
 
-  const change = async (newStatus: string) => {
-    if (!confirm('Set partner status to ' + newStatus + '?')) return;
+  const change = async (s: string) => {
+    if (!confirm('Set partner status to ' + s + '?')) return;
     try {
-      await adminDeliveryApi.updateStatus(id!, newStatus as any);
+      await adminDeliveryApi.updateStatus(id!, s as any);
+      setPartner({ ...partner, status: s });
       toast.success('Updated');
-      setPartner({ ...partner, status: newStatus });
     } catch (e) { toast.error(getErrorMessage(e)); }
   };
 
   return (
     <div>
       <button onClick={() => navigate(-1)} style={{ marginBottom: 16 }}>← Back</button>
-      <h1 style={{ marginTop: 0 }}>
-        {partner.phone} <StatusBadge status={partner.status} />
-      </h1>
+      <h1 style={{ marginTop: 0 }}>{partner.phone} <StatusBadge status={partner.status} /></h1>
       <p style={{ color: '#6b7280', fontSize: 13 }}>
         {partner.vehicleType} · {partner.availability}
         {partner.latitude && partner.longitude ? ' · live: ' + partner.latitude.toFixed(4) + ', ' + partner.longitude.toFixed(4) : ''}
@@ -87,12 +99,8 @@ const DeliveryPartnerDetail: React.FC = () => {
             <button onClick={() => change('APPROVED')} style={{ background: '#16a34a', color: '#fff', border: 0 }}>Approve</button>
             <button onClick={() => change('REJECTED')} style={{ background: '#dc2626', color: '#fff', border: 0 }}>Reject</button>
           </>)}
-          {partner.status === 'APPROVED' && (
-            <button onClick={() => change('SUSPENDED')} style={{ background: '#dc2626', color: '#fff', border: 0 }}>Suspend</button>
-          )}
-          {partner.status === 'SUSPENDED' && (
-            <button onClick={() => change('APPROVED')} style={{ background: '#16a34a', color: '#fff', border: 0 }}>Re-activate</button>
-          )}
+          {partner.status === 'APPROVED' && <button onClick={() => change('SUSPENDED')} style={{ background: '#dc2626', color: '#fff', border: 0 }}>Suspend</button>}
+          {partner.status === 'SUSPENDED' && <button onClick={() => change('APPROVED')} style={{ background: '#16a34a', color: '#fff', border: 0 }}>Re-activate</button>}
         </div>
       </Section>
 

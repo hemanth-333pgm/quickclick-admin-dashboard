@@ -9,11 +9,18 @@ import toast from 'react-hot-toast';
 const extractList = (data: any): any[] => {
   if (Array.isArray(data)) return data;
   if (!data || typeof data !== 'object') return [];
-  for (const key of ['products', 'orders', 'results', 'items', 'list']) {
-    if (Array.isArray(data[key])) return data[key];
+  for (const k of ['products','orders','results','items','list']) {
+    if (Array.isArray(data[k])) return data[k];
   }
   for (const v of Object.values(data)) if (Array.isArray(v)) return v as any[];
   return [];
+};
+
+const refId = (v: any): string | undefined => {
+  if (!v) return undefined;
+  if (typeof v === 'string') return v;
+  if (typeof v === 'object') return v._id || v.id;
+  return undefined;
 };
 
 const RetailerDetail: React.FC = () => {
@@ -32,11 +39,15 @@ const RetailerDetail: React.FC = () => {
         const [rRes, pRes, oRes] = await Promise.all([
           adminRetailersApi.getOne(id).catch(() => null),
           adminRetailersApi.products(id).catch(() => null),
-          adminRetailersApi.orders(id).catch(() => null),
+          adminRetailersApi.orders().catch(() => null),
         ]);
-        if (rRes) setRetailer(rRes.data.data);
-        if (pRes) setProducts(extractList(pRes.data.data));
-        if (oRes) setOrders(extractList(oRes.data.data));
+        if (rRes) setRetailer((rRes.data as any).data);
+        if (pRes) setProducts(extractList((pRes.data as any).data));
+        if (oRes) {
+          const all = extractList((oRes.data as any).data);
+          const mine = all.filter((o) => refId(o.retailerId) === String(id));
+          setOrders(mine);
+        }
       } catch (e) { toast.error(getErrorMessage(e)); } finally { setLoading(false); }
     })();
   }, [id]);
@@ -46,21 +57,19 @@ const RetailerDetail: React.FC = () => {
 
   const revenue = orders.filter((o) => o.status === 'DELIVERED').reduce((s, o) => s + (o.total || 0), 0);
 
-  const change = async (newStatus: string) => {
-    if (!confirm('Set retailer status to ' + newStatus + '?')) return;
+  const change = async (s: string) => {
+    if (!confirm('Set retailer status to ' + s + '?')) return;
     try {
-      await adminRetailersApi.updateStatus(id!, newStatus as any, 'Reviewed by admin');
+      await adminRetailersApi.updateStatus(id!, s as any, 'Reviewed by admin');
+      setRetailer({ ...retailer, status: s });
       toast.success('Updated');
-      setRetailer({ ...retailer, status: newStatus });
     } catch (e) { toast.error(getErrorMessage(e)); }
   };
 
   return (
     <div>
       <button onClick={() => navigate(-1)} style={{ marginBottom: 16 }}>← Back</button>
-      <h1 style={{ marginTop: 0 }}>
-        {retailer.shopName} <StatusBadge status={retailer.status} />
-      </h1>
+      <h1 style={{ marginTop: 0 }}>{retailer.shopName} <StatusBadge status={retailer.status} /></h1>
       <p style={{ color: '#6b7280', fontSize: 13 }}>{retailer.phone} · {retailer.isOpen ? 'Open now' : 'Closed'}</p>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, margin: '20px 0' }}>
@@ -86,12 +95,8 @@ const RetailerDetail: React.FC = () => {
             <button onClick={() => change('APPROVED')} style={{ background: '#16a34a', color: '#fff', border: 0 }}>Approve</button>
             <button onClick={() => change('REJECTED')} style={{ background: '#dc2626', color: '#fff', border: 0 }}>Reject</button>
           </>)}
-          {retailer.status === 'APPROVED' && (
-            <button onClick={() => change('SUSPENDED')} style={{ background: '#dc2626', color: '#fff', border: 0 }}>Suspend</button>
-          )}
-          {retailer.status === 'SUSPENDED' && (
-            <button onClick={() => change('APPROVED')} style={{ background: '#16a34a', color: '#fff', border: 0 }}>Re-activate</button>
-          )}
+          {retailer.status === 'APPROVED' && <button onClick={() => change('SUSPENDED')} style={{ background: '#dc2626', color: '#fff', border: 0 }}>Suspend</button>}
+          {retailer.status === 'SUSPENDED' && <button onClick={() => change('APPROVED')} style={{ background: '#16a34a', color: '#fff', border: 0 }}>Re-activate</button>}
         </div>
       </Section>
 
