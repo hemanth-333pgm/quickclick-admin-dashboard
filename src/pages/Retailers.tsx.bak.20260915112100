@@ -1,6 +1,6 @@
 ﻿import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { axiosClient as api } from "../api/axiosClient";
+import api from "../lib/api";
 
 interface Retailer {
   _id: string;

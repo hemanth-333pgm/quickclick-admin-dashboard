@@ -1,13 +1,11 @@
 ﻿import React, { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { axiosClient as api } from "../api/axiosClient";
-import { DocumentCard } from "../components/DocumentCard";
-import type { Doc } from "../components/DocumentCard";
+import api from "../lib/api";
+import { DocumentCard, Doc } from "../components/DocumentCard";
 import { RejectModal } from "../components/RejectModal";
 
 export const RetailerDetail: React.FC = () => {
-  const params = useParams<{ id: string }>();
-  const id = params.id || "";
+  const { id } = useParams<{ id: string }>();
   const nav = useNavigate();
   const [retailer, setRetailer] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -18,7 +16,7 @@ export const RetailerDetail: React.FC = () => {
   const load = async () => {
     setLoading(true);
     try {
-      const r = await api.get("/admin/retailers/" + id);
+      const r = await api.get(`/admin/retailers/${id}`);
       setRetailer(r.data.data);
     } finally {
       setLoading(false);
@@ -30,7 +28,7 @@ export const RetailerDetail: React.FC = () => {
   const approveStore = async () => {
     setBusy(true);
     try {
-      await api.patch("/admin/retailers/" + id + "/status", { status: "APPROVED" });
+      await api.patch(`/admin/retailers/${id}/status`, { status: "APPROVED" });
       nav("/retailers");
     } finally { setBusy(false); }
   };
@@ -38,20 +36,17 @@ export const RetailerDetail: React.FC = () => {
   const rejectStore = async (reason: string) => {
     setBusy(true);
     try {
-      await api.patch("/admin/retailers/" + id + "/status", {
-        status: "REJECTED",
-        remarks: reason,
-      });
+      await api.patch(`/admin/retailers/${id}/status`, { status: "REJECTED", remarks: reason });
       setRejectOpen(false);
       nav("/retailers");
     } finally { setBusy(false); }
   };
 
   const approveDoc = async (type: string) => {
-    if (!window.confirm("Approve " + type + "?")) return;
+    if (!confirm(`Approve ${type}?`)) return;
     setBusy(true);
     try {
-      await api.patch("/admin/retailers/" + id + "/documents/" + type, { status: "APPROVED" });
+      await api.patch(`/admin/retailers/${id}/documents/${type}`, { status: "APPROVED" });
       await load();
     } catch (e: any) {
       alert(e?.response?.data?.error?.message || "Failed");
@@ -64,7 +59,7 @@ export const RetailerDetail: React.FC = () => {
     if (!docReject) return;
     setBusy(true);
     try {
-      await api.patch("/admin/retailers/" + id + "/documents/" + docReject, {
+      await api.patch(`/admin/retailers/${id}/documents/${docReject}`, {
         status: "REJECTED",
         remarks: reason,
       });
@@ -79,10 +74,10 @@ export const RetailerDetail: React.FC = () => {
   if (!retailer) return <div style={{ padding: 24 }}>Not found</div>;
 
   const statusColor =
-    retailer.status === "APPROVED" ? "#16a34a" :
-    retailer.status === "REJECTED" ? "#dc2626" :
-    retailer.status === "SUSPENDED" ? "#6b7280" :
-    "#f59e0b";
+    retailer.status === "APPROVED" ? "#16a34a"
+    : retailer.status === "REJECTED" ? "#dc2626"
+    : retailer.status === "SUSPENDED" ? "#6b7280"
+    : "#f59e0b";
 
   return (
     <div style={{ padding: 24, fontFamily: "system-ui, sans-serif" }}>
@@ -90,37 +85,41 @@ export const RetailerDetail: React.FC = () => {
         onClick={() => nav("/retailers")}
         style={{ background: 0, border: 0, color: "#2563eb", cursor: "pointer", marginBottom: 12 }}
       >
-        Back to Retailers
+        ← Back to Retailers
       </button>
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <h1 style={{ margin: 0, fontSize: 24 }}>{retailer.shopName}</h1>
-        <span style={{
-          background: statusColor + "20",
-          color: statusColor,
-          padding: "4px 12px",
-          borderRadius: 12,
-          fontSize: 12,
-          fontWeight: 600,
-        }}>
+        <span
+          style={{
+            background: statusColor + "20",
+            color: statusColor,
+            padding: "4px 12px",
+            borderRadius: 12,
+            fontSize: 12,
+            fontWeight: 600,
+          }}
+        >
           {retailer.status}
         </span>
       </div>
 
-      <div style={{
-        background: "#fff",
-        borderRadius: 8,
-        padding: 20,
-        marginTop: 16,
-        display: "grid",
-        gridTemplateColumns: "repeat(2, 1fr)",
-        gap: 16,
-        fontSize: 14,
-      }}>
+      <div
+        style={{
+          background: "#fff",
+          borderRadius: 8,
+          padding: 20,
+          marginTop: 16,
+          display: "grid",
+          gridTemplateColumns: "repeat(2, 1fr)",
+          gap: 16,
+          fontSize: 14,
+        }}
+      >
         <div><strong>Owner:</strong> {retailer.ownerId?.name || "-"}</div>
         <div><strong>Mobile:</strong> {retailer.phone || retailer.ownerId?.mobile || "-"}</div>
         <div><strong>Email:</strong> {retailer.email || "-"}</div>
-        <div><strong>Categories:</strong> {(retailer.categories || []).join(", ") || "-"}</div>
+        <div><strong>Categories:</strong> {retailer.categories?.join(", ") || "-"}</div>
         <div><strong>Address:</strong> {retailer.address?.line1}, {retailer.address?.city}, {retailer.address?.state}</div>
         <div><strong>Postal:</strong> {retailer.address?.postalCode || "-"}</div>
       </div>
@@ -131,17 +130,16 @@ export const RetailerDetail: React.FC = () => {
         </div>
       )}
 
-      <h2 style={{ marginTop: 32, fontSize: 18 }}>
-        Documents ({(retailer.documents || []).length})
-      </h2>
-
-      <div style={{
-        display: "grid",
-        gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))",
-        gap: 16,
-        marginTop: 12,
-      }}>
-        {(retailer.documents || []).map((doc: Doc) => (
+      <h2 style={{ marginTop: 32, fontSize: 18 }}>Documents ({retailer.documents?.length || 0})</h2>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))",
+          gap: 16,
+          marginTop: 12,
+        }}
+      >
+        {retailer.documents?.map((doc: Doc) => (
           <DocumentCard
             key={doc.type}
             doc={doc}
@@ -196,7 +194,7 @@ export const RetailerDetail: React.FC = () => {
         onConfirm={rejectStore}
       />
       <RejectModal
-        title={"Reject Document: " + (docReject || "")}
+        title={`Reject Document: ${docReject}`}
         open={!!docReject}
         onClose={() => setDocReject(null)}
         onConfirm={rejectDoc}

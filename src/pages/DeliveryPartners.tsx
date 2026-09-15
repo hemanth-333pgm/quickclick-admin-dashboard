@@ -1,84 +1,189 @@
-﻿import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { adminDeliveryApi } from '../api/delivery.api';
-import { getErrorMessage } from '../api/axiosClient';
-import StatusBadge from '../components/StatusBadge';
-import toast from 'react-hot-toast';
+﻿import React, { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
+import { axiosClient as api } from "../api/axiosClient";
 
-const extractList = (data: any): any[] => {
-  if (Array.isArray(data)) return data;
-  if (!data || typeof data !== 'object') return [];
-  for (const key of ['deliveryPartners', 'partners', 'results', 'items', 'list', 'rows', 'docs']) {
-    if (Array.isArray(data[key])) return data[key];
-  }
-  for (const v of Object.values(data)) if (Array.isArray(v)) return v as any[];
-  return [];
+interface Partner {
+  _id: string;
+  userId?: { name?: string; mobile?: string };
+  vehicleType: string;
+  vehicleNumber: string;
+  verificationStatus: "PENDING" | "APPROVED" | "REJECTED" | "SUSPENDED";
+  documents?: any[];
+  createdAt: string;
+}
+
+const STATUS_FILTERS = ["ALL", "PENDING", "APPROVED", "REJECTED", "SUSPENDED"] as const;
+
+const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
+  const colors: Record<string, string> = {
+    PENDING: "#f59e0b",
+    APPROVED: "#16a34a",
+    REJECTED: "#dc2626",
+    SUSPENDED: "#6b7280",
+  };
+  return (
+    <span
+      style={{
+        background: (colors[status] || "#6b7280") + "20",
+        color: colors[status] || "#6b7280",
+        padding: "3px 10px",
+        borderRadius: 12,
+        fontSize: 11,
+        fontWeight: 600,
+      }}
+    >
+      {status}
+    </span>
+  );
 };
 
-const DeliveryPartners: React.FC = () => {
-  const navigate = useNavigate();
-  const [items, setItems] = useState<any[]>([]);
-  const [status, setStatus] = useState('');
+export const DeliveryPartners: React.FC = () => {
+  const [partners, setPartners] = useState<Partner[]>([]);
+  const [filter, setFilter] = useState<string>("ALL");
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const load = async () => {
-    setLoading(true);
     try {
-      const res = await adminDeliveryApi.list({ status, page: 1, limit: 50 });
-      setItems(extractList((res.data as any).data));
-    } catch (e) { toast.error(getErrorMessage(e)); setItems([]); }
-    finally { setLoading(false); }
+      setLoading(true);
+      setError(null);
+      const params: any = { limit: 100 };
+      if (filter !== "ALL") params.verificationStatus = filter;
+
+      const res = await api.get("/admin/delivery-partners", { params });
+
+      const outer = res.data?.data;
+      let list: Partner[] = [];
+      if (Array.isArray(outer)) {
+        list = outer;
+      } else if (outer && Array.isArray(outer.partners)) {
+        list = outer.partners;
+      } else if (outer && Array.isArray(outer.deliveryPartners)) {
+        list = outer.deliveryPartners;
+      }
+
+      console.log("[DeliveryPartners] Response shape:", outer);
+      console.log("[DeliveryPartners] Loaded", list.length, "partners");
+      setPartners(list);
+    } catch (e: any) {
+      console.error("[DeliveryPartners] Error:", e);
+      setError(e?.response?.data?.error?.message || e.message);
+      setPartners([]);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  useEffect(() => { load(); }, [status]);
-
-  const change = async (id: string, newStatus: string) => {
-    if (!confirm('Set delivery partner status to ' + newStatus + '?')) return;
-    try {
-      await adminDeliveryApi.updateStatus(id, newStatus as any);
-      toast.success('Updated'); load();
-    } catch (e) { toast.error(getErrorMessage(e)); }
-  };
+  useEffect(() => {
+    load();
+  }, [filter]);
 
   return (
-    <div>
-      <h1 style={{ marginTop: 0 }}>Delivery Partners</h1>
-      <select value={status} onChange={(e) => setStatus(e.target.value)} style={{ marginBottom: 16 }}>
-        <option value="">All statuses</option>
-        <option value="PENDING">Pending</option>
-        <option value="APPROVED">Approved</option>
-        <option value="REJECTED">Rejected</option>
-        <option value="SUSPENDED">Suspended</option>
-      </select>
-      {loading ? <div>Loading...</div> : (
-        <div style={{ background: '#fff', borderRadius: 8, overflow: 'hidden' }}>
-          <table width="100%" cellPadding={10}>
-            <thead style={{ background: '#f3f4f6', textAlign: 'left', fontSize: 12 }}>
-              <tr><th>Phone</th><th>Vehicle</th><th>Availability</th><th>Status</th><th>Actions</th></tr>
-            </thead>
-            <tbody>
-              {items.length === 0 && (<tr><td colSpan={5} style={{ textAlign: 'center', color: '#9ca3af', padding: 24 }}>No delivery partners</td></tr>)}
-              {items.map((p) => (
-                <tr key={p._id} style={{ borderTop: '1px solid #eee', fontSize: 13 }}>
-                  <td>{p.phone}</td>
-                  <td>{p.vehicleType} - {p.vehicleNumber}</td>
-                  <td><StatusBadge status={p.availability} /></td>
-                  <td><StatusBadge status={p.status} /></td>
-                  <td>
-                    <button onClick={() => navigate('/delivery-partners/' + p._id)}>View</button>{' '}
-                    {p.status === 'PENDING' && (<>
-                      <button onClick={() => change(p._id, 'APPROVED')}>Approve</button>{' '}
-                      <button onClick={() => change(p._id, 'REJECTED')}>Reject</button>
-                    </>)}
-                    {p.status === 'APPROVED' && <button onClick={() => change(p._id, 'SUSPENDED')}>Suspend</button>}
-                    {p.status === 'SUSPENDED' && <button onClick={() => change(p._id, 'APPROVED')}>Re-activate</button>}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+    <div style={{ padding: 24, fontFamily: "system-ui, sans-serif" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <h1 style={{ margin: 0, fontSize: 24 }}>Delivery Partners</h1>
+        <button
+          onClick={load}
+          disabled={loading}
+          style={{
+            padding: "8px 16px",
+            background: "#f3f4f6",
+            border: 0,
+            borderRadius: 6,
+            cursor: "pointer",
+            fontSize: 13,
+          }}
+        >
+          {loading ? "Loading..." : "Refresh"}
+        </button>
+      </div>
+
+      <div style={{ marginTop: 16, display: "flex", gap: 8 }}>
+        {STATUS_FILTERS.map((f) => (
+          <button
+            key={f}
+            onClick={() => setFilter(f)}
+            style={{
+              padding: "6px 14px",
+              borderRadius: 6,
+              border: 0,
+              background: filter === f ? "#2563eb" : "#f3f4f6",
+              color: filter === f ? "#fff" : "#374151",
+              cursor: "pointer",
+              fontSize: 13,
+              fontWeight: 500,
+            }}
+          >
+            {f}
+          </button>
+        ))}
+      </div>
+
+      {error && (
+        <div style={{ marginTop: 16, padding: 12, background: "#fef2f2", color: "#991b1b", borderRadius: 6 }}>
+          {error}
         </div>
       )}
+
+      <div style={{ marginTop: 20, background: "#fff", borderRadius: 8, overflow: "hidden" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse" }}>
+          <thead style={{ background: "#f9fafb" }}>
+            <tr>
+              <th style={{ padding: 12, textAlign: "left", fontSize: 12, color: "#6b7280" }}>Name</th>
+              <th style={{ padding: 12, textAlign: "left", fontSize: 12, color: "#6b7280" }}>Mobile</th>
+              <th style={{ padding: 12, textAlign: "left", fontSize: 12, color: "#6b7280" }}>Vehicle</th>
+              <th style={{ padding: 12, textAlign: "left", fontSize: 12, color: "#6b7280" }}>Docs</th>
+              <th style={{ padding: 12, textAlign: "left", fontSize: 12, color: "#6b7280" }}>Status</th>
+              <th style={{ padding: 12, textAlign: "right", fontSize: 12, color: "#6b7280" }}>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {loading && partners.length === 0 && (
+              <tr>
+                <td colSpan={6} style={{ padding: 24, textAlign: "center", color: "#6b7280" }}>
+                  Loading...
+                </td>
+              </tr>
+            )}
+            {!loading && partners.length === 0 && (
+              <tr>
+                <td colSpan={6} style={{ padding: 24, textAlign: "center", color: "#6b7280" }}>
+                  No delivery partners found
+                </td>
+              </tr>
+            )}
+            {partners.map((p) => (
+              <tr key={p._id} style={{ borderTop: "1px solid #f3f4f6" }}>
+                <td style={{ padding: 12, fontWeight: 600 }}>{p.userId?.name || "-"}</td>
+                <td style={{ padding: 12 }}>{p.userId?.mobile || "-"}</td>
+                <td style={{ padding: 12 }}>
+                  {p.vehicleType} / {p.vehicleNumber}
+                </td>
+                <td style={{ padding: 12 }}>{(p.documents || []).length}</td>
+                <td style={{ padding: 12 }}>
+                  <StatusBadge status={p.verificationStatus} />
+                </td>
+                <td style={{ padding: 12, textAlign: "right" }}>
+                  <Link
+                    to={"/delivery-partners/" + p._id}
+                    style={{
+                      padding: "6px 12px",
+                      background: "#2563eb",
+                      color: "#fff",
+                      textDecoration: "none",
+                      borderRadius: 4,
+                      fontSize: 12,
+                      fontWeight: 500,
+                    }}
+                  >
+                    View
+                  </Link>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 };

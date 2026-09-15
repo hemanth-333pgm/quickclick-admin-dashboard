@@ -1,6 +1,6 @@
 ﻿import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { axiosClient as api } from "../api/axiosClient";
+import api from "../lib/api";
 
 interface Retailer {
   _id: string;
@@ -39,7 +39,7 @@ const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
 
 export const Retailers: React.FC = () => {
   const [retailers, setRetailers] = useState<Retailer[]>([]);
-  const [filter, setFilter] = useState<string>("ALL");
+  const [filter, setFilter] = useState<string>("PENDING");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -49,24 +49,16 @@ export const Retailers: React.FC = () => {
       setError(null);
       const params: any = { limit: 100 };
       if (filter !== "ALL") params.status = filter;
-
       const res = await api.get("/admin/retailers", { params });
-
       const outer = res.data?.data;
-      let list: Retailer[] = [];
-      if (Array.isArray(outer)) {
-        list = outer;
-      } else if (outer && Array.isArray(outer.retailers)) {
-        list = outer.retailers;
-      }
-
-      console.log("[Retailers] Response shape:", outer);
-      console.log("[Retailers] Loaded", list.length, "retailers");
+      const list = Array.isArray(outer)
+        ? outer
+        : Array.isArray(outer?.retailers)
+          ? outer.retailers
+          : [];
       setRetailers(list);
     } catch (e: any) {
-      console.error("[Retailers] Error:", e);
       setError(e?.response?.data?.error?.message || e.message);
-      setRetailers([]);
     } finally {
       setLoading(false);
     }
@@ -92,7 +84,7 @@ export const Retailers: React.FC = () => {
             fontSize: 13,
           }}
         >
-          {loading ? "Loading..." : "Refresh"}
+          Refresh
         </button>
       </div>
 
@@ -137,33 +129,23 @@ export const Retailers: React.FC = () => {
           </thead>
           <tbody>
             {loading && retailers.length === 0 && (
-              <tr>
-                <td colSpan={6} style={{ padding: 24, textAlign: "center", color: "#6b7280" }}>
-                  Loading...
-                </td>
-              </tr>
+              <tr><td colSpan={6} style={{ padding: 24, textAlign: "center", color: "#6b7280" }}>Loading...</td></tr>
             )}
             {!loading && retailers.length === 0 && (
-              <tr>
-                <td colSpan={6} style={{ padding: 24, textAlign: "center", color: "#6b7280" }}>
-                  No retailers found
-                </td>
-              </tr>
+              <tr><td colSpan={6} style={{ padding: 24, textAlign: "center", color: "#6b7280" }}>No retailers found</td></tr>
             )}
             {retailers.map((r) => (
               <tr key={r._id} style={{ borderTop: "1px solid #f3f4f6" }}>
                 <td style={{ padding: 12, fontWeight: 600 }}>{r.shopName}</td>
                 <td style={{ padding: 12 }}>{r.ownerId?.name || "-"}</td>
                 <td style={{ padding: 12 }}>{r.phone || r.ownerId?.mobile || "-"}</td>
-                <td style={{ padding: 12 }}>
-                  <StatusBadge status={r.status} />
-                </td>
+                <td style={{ padding: 12 }}><StatusBadge status={r.status} /></td>
                 <td style={{ padding: 12, fontSize: 12, color: "#6b7280" }}>
                   {new Date(r.createdAt).toLocaleDateString()}
                 </td>
                 <td style={{ padding: 12, textAlign: "right" }}>
                   <Link
-                    to={"/retailers/" + r._id}
+                    to={`/retailers/${r._id}`}
                     style={{
                       padding: "6px 12px",
                       background: "#2563eb",

@@ -1,13 +1,11 @@
 ﻿import React, { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { axiosClient as api } from "../api/axiosClient";
-import { DocumentCard } from "../components/DocumentCard";
-import type { Doc } from "../components/DocumentCard";
+import api from "../lib/api";
+import { DocumentCard, Doc } from "../components/DocumentCard";
 import { RejectModal } from "../components/RejectModal";
 
 export const DeliveryPartnerDetail: React.FC = () => {
-  const params = useParams<{ id: string }>();
-  const id = params.id || "";
+  const { id } = useParams<{ id: string }>();
   const nav = useNavigate();
   const [partner, setPartner] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -18,7 +16,7 @@ export const DeliveryPartnerDetail: React.FC = () => {
   const load = async () => {
     setLoading(true);
     try {
-      const r = await api.get("/admin/delivery-partners/" + id);
+      const r = await api.get(`/admin/delivery-partners/${id}`);
       setPartner(r.data.data);
     } finally {
       setLoading(false);
@@ -30,7 +28,7 @@ export const DeliveryPartnerDetail: React.FC = () => {
   const approvePartner = async () => {
     setBusy(true);
     try {
-      await api.patch("/admin/delivery-partners/" + id + "/verification", {
+      await api.patch(`/admin/delivery-partners/${id}/verification`, {
         verificationStatus: "APPROVED",
       });
       nav("/delivery-partners");
@@ -40,7 +38,7 @@ export const DeliveryPartnerDetail: React.FC = () => {
   const rejectPartner = async (reason: string) => {
     setBusy(true);
     try {
-      await api.patch("/admin/delivery-partners/" + id + "/verification", {
+      await api.patch(`/admin/delivery-partners/${id}/verification`, {
         verificationStatus: "REJECTED",
         remarks: reason,
       });
@@ -50,10 +48,10 @@ export const DeliveryPartnerDetail: React.FC = () => {
   };
 
   const approveDoc = async (type: string) => {
-    if (!window.confirm("Approve " + type + "?")) return;
+    if (!confirm(`Approve ${type}?`)) return;
     setBusy(true);
     try {
-      await api.patch("/admin/delivery-partners/" + id + "/documents/" + type, {
+      await api.patch(`/admin/delivery-partners/${id}/documents/${type}`, {
         status: "APPROVED",
       });
       await load();
@@ -68,7 +66,7 @@ export const DeliveryPartnerDetail: React.FC = () => {
     if (!docReject) return;
     setBusy(true);
     try {
-      await api.patch("/admin/delivery-partners/" + id + "/documents/" + docReject, {
+      await api.patch(`/admin/delivery-partners/${id}/documents/${docReject}`, {
         status: "REJECTED",
         remarks: reason,
       });
@@ -84,10 +82,10 @@ export const DeliveryPartnerDetail: React.FC = () => {
 
   const vs = partner.verificationStatus || "PENDING";
   const statusColor =
-    vs === "APPROVED" ? "#16a34a" :
-    vs === "REJECTED" ? "#dc2626" :
-    vs === "SUSPENDED" ? "#6b7280" :
-    "#f59e0b";
+    vs === "APPROVED" ? "#16a34a"
+    : vs === "REJECTED" ? "#dc2626"
+    : vs === "SUSPENDED" ? "#6b7280"
+    : "#f59e0b";
 
   return (
     <div style={{ padding: 24, fontFamily: "system-ui, sans-serif" }}>
@@ -95,36 +93,40 @@ export const DeliveryPartnerDetail: React.FC = () => {
         onClick={() => nav("/delivery-partners")}
         style={{ background: 0, border: 0, color: "#2563eb", cursor: "pointer", marginBottom: 12 }}
       >
-        Back to Delivery Partners
+        ← Back to Delivery Partners
       </button>
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <h1 style={{ margin: 0, fontSize: 24 }}>{partner.userId?.name || "Partner"}</h1>
-        <span style={{
-          background: statusColor + "20",
-          color: statusColor,
-          padding: "4px 12px",
-          borderRadius: 12,
-          fontSize: 12,
-          fontWeight: 600,
-        }}>
+        <span
+          style={{
+            background: statusColor + "20",
+            color: statusColor,
+            padding: "4px 12px",
+            borderRadius: 12,
+            fontSize: 12,
+            fontWeight: 600,
+          }}
+        >
           {vs}
         </span>
       </div>
 
-      <div style={{
-        background: "#fff",
-        borderRadius: 8,
-        padding: 20,
-        marginTop: 16,
-        display: "grid",
-        gridTemplateColumns: "repeat(2, 1fr)",
-        gap: 16,
-        fontSize: 14,
-      }}>
+      <div
+        style={{
+          background: "#fff",
+          borderRadius: 8,
+          padding: 20,
+          marginTop: 16,
+          display: "grid",
+          gridTemplateColumns: "repeat(2, 1fr)",
+          gap: 16,
+          fontSize: 14,
+        }}
+      >
         <div><strong>Mobile:</strong> {partner.userId?.mobile || partner.phone || "-"}</div>
         <div><strong>Email:</strong> {partner.userId?.email || partner.email || "-"}</div>
-        <div><strong>Vehicle:</strong> {partner.vehicleType} . {partner.vehicleNumber}</div>
+        <div><strong>Vehicle:</strong> {partner.vehicleType} · {partner.vehicleNumber}</div>
         <div><strong>Model:</strong> {partner.vehicleModel || "-"}</div>
         <div><strong>License No:</strong> {partner.licenseNumber || "-"}</div>
         <div><strong>Availability:</strong> {partner.availability || "-"}</div>
@@ -136,17 +138,16 @@ export const DeliveryPartnerDetail: React.FC = () => {
         </div>
       )}
 
-      <h2 style={{ marginTop: 32, fontSize: 18 }}>
-        Documents ({(partner.documents || []).length})
-      </h2>
-
-      <div style={{
-        display: "grid",
-        gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))",
-        gap: 16,
-        marginTop: 12,
-      }}>
-        {(partner.documents || []).map((doc: Doc) => (
+      <h2 style={{ marginTop: 32, fontSize: 18 }}>Documents ({partner.documents?.length || 0})</h2>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))",
+          gap: 16,
+          marginTop: 12,
+        }}
+      >
+        {partner.documents?.map((doc: Doc) => (
           <DocumentCard
             key={doc.type}
             doc={doc}
@@ -201,7 +202,7 @@ export const DeliveryPartnerDetail: React.FC = () => {
         onConfirm={rejectPartner}
       />
       <RejectModal
-        title={"Reject Document: " + (docReject || "")}
+        title={`Reject Document: ${docReject}`}
         open={!!docReject}
         onClose={() => setDocReject(null)}
         onConfirm={rejectDoc}

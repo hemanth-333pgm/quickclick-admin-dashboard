@@ -1,6 +1,6 @@
 ﻿import React, { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { axiosClient as api } from "../api/axiosClient";
+import api from "../lib/api";
 import { DocumentCard } from "../components/DocumentCard";
 import type { Doc } from "../components/DocumentCard";
 import { RejectModal } from "../components/RejectModal";

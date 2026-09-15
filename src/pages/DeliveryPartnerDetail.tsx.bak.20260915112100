@@ -1,15 +1,15 @@
 ﻿import React, { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { axiosClient as api } from "../api/axiosClient";
+import api from "../lib/api";
 import { DocumentCard } from "../components/DocumentCard";
 import type { Doc } from "../components/DocumentCard";
 import { RejectModal } from "../components/RejectModal";
 
-export const RetailerDetail: React.FC = () => {
+export const DeliveryPartnerDetail: React.FC = () => {
   const params = useParams<{ id: string }>();
   const id = params.id || "";
   const nav = useNavigate();
-  const [retailer, setRetailer] = useState<any>(null);
+  const [partner, setPartner] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [rejectOpen, setRejectOpen] = useState(false);
@@ -18,8 +18,8 @@ export const RetailerDetail: React.FC = () => {
   const load = async () => {
     setLoading(true);
     try {
-      const r = await api.get("/admin/retailers/" + id);
-      setRetailer(r.data.data);
+      const r = await api.get("/admin/delivery-partners/" + id);
+      setPartner(r.data.data);
     } finally {
       setLoading(false);
     }
@@ -27,23 +27,25 @@ export const RetailerDetail: React.FC = () => {
 
   useEffect(() => { load(); }, [id]);
 
-  const approveStore = async () => {
+  const approvePartner = async () => {
     setBusy(true);
     try {
-      await api.patch("/admin/retailers/" + id + "/status", { status: "APPROVED" });
-      nav("/retailers");
+      await api.patch("/admin/delivery-partners/" + id + "/verification", {
+        verificationStatus: "APPROVED",
+      });
+      nav("/delivery-partners");
     } finally { setBusy(false); }
   };
 
-  const rejectStore = async (reason: string) => {
+  const rejectPartner = async (reason: string) => {
     setBusy(true);
     try {
-      await api.patch("/admin/retailers/" + id + "/status", {
-        status: "REJECTED",
+      await api.patch("/admin/delivery-partners/" + id + "/verification", {
+        verificationStatus: "REJECTED",
         remarks: reason,
       });
       setRejectOpen(false);
-      nav("/retailers");
+      nav("/delivery-partners");
     } finally { setBusy(false); }
   };
 
@@ -51,7 +53,9 @@ export const RetailerDetail: React.FC = () => {
     if (!window.confirm("Approve " + type + "?")) return;
     setBusy(true);
     try {
-      await api.patch("/admin/retailers/" + id + "/documents/" + type, { status: "APPROVED" });
+      await api.patch("/admin/delivery-partners/" + id + "/documents/" + type, {
+        status: "APPROVED",
+      });
       await load();
     } catch (e: any) {
       alert(e?.response?.data?.error?.message || "Failed");
@@ -64,7 +68,7 @@ export const RetailerDetail: React.FC = () => {
     if (!docReject) return;
     setBusy(true);
     try {
-      await api.patch("/admin/retailers/" + id + "/documents/" + docReject, {
+      await api.patch("/admin/delivery-partners/" + id + "/documents/" + docReject, {
         status: "REJECTED",
         remarks: reason,
       });
@@ -76,25 +80,26 @@ export const RetailerDetail: React.FC = () => {
   };
 
   if (loading) return <div style={{ padding: 24 }}>Loading...</div>;
-  if (!retailer) return <div style={{ padding: 24 }}>Not found</div>;
+  if (!partner) return <div style={{ padding: 24 }}>Not found</div>;
 
+  const vs = partner.verificationStatus || "PENDING";
   const statusColor =
-    retailer.status === "APPROVED" ? "#16a34a" :
-    retailer.status === "REJECTED" ? "#dc2626" :
-    retailer.status === "SUSPENDED" ? "#6b7280" :
+    vs === "APPROVED" ? "#16a34a" :
+    vs === "REJECTED" ? "#dc2626" :
+    vs === "SUSPENDED" ? "#6b7280" :
     "#f59e0b";
 
   return (
     <div style={{ padding: 24, fontFamily: "system-ui, sans-serif" }}>
       <button
-        onClick={() => nav("/retailers")}
+        onClick={() => nav("/delivery-partners")}
         style={{ background: 0, border: 0, color: "#2563eb", cursor: "pointer", marginBottom: 12 }}
       >
-        Back to Retailers
+        Back to Delivery Partners
       </button>
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <h1 style={{ margin: 0, fontSize: 24 }}>{retailer.shopName}</h1>
+        <h1 style={{ margin: 0, fontSize: 24 }}>{partner.userId?.name || "Partner"}</h1>
         <span style={{
           background: statusColor + "20",
           color: statusColor,
@@ -103,7 +108,7 @@ export const RetailerDetail: React.FC = () => {
           fontSize: 12,
           fontWeight: 600,
         }}>
-          {retailer.status}
+          {vs}
         </span>
       </div>
 
@@ -117,22 +122,22 @@ export const RetailerDetail: React.FC = () => {
         gap: 16,
         fontSize: 14,
       }}>
-        <div><strong>Owner:</strong> {retailer.ownerId?.name || "-"}</div>
-        <div><strong>Mobile:</strong> {retailer.phone || retailer.ownerId?.mobile || "-"}</div>
-        <div><strong>Email:</strong> {retailer.email || "-"}</div>
-        <div><strong>Categories:</strong> {(retailer.categories || []).join(", ") || "-"}</div>
-        <div><strong>Address:</strong> {retailer.address?.line1}, {retailer.address?.city}, {retailer.address?.state}</div>
-        <div><strong>Postal:</strong> {retailer.address?.postalCode || "-"}</div>
+        <div><strong>Mobile:</strong> {partner.userId?.mobile || partner.phone || "-"}</div>
+        <div><strong>Email:</strong> {partner.userId?.email || partner.email || "-"}</div>
+        <div><strong>Vehicle:</strong> {partner.vehicleType} . {partner.vehicleNumber}</div>
+        <div><strong>Model:</strong> {partner.vehicleModel || "-"}</div>
+        <div><strong>License No:</strong> {partner.licenseNumber || "-"}</div>
+        <div><strong>Availability:</strong> {partner.availability || "-"}</div>
       </div>
 
-      {retailer.remarks && (
+      {partner.remarks && (
         <div style={{ marginTop: 16, padding: 12, background: "#fef2f2", color: "#991b1b", borderRadius: 6 }}>
-          <strong>Remarks:</strong> {retailer.remarks}
+          <strong>Remarks:</strong> {partner.remarks}
         </div>
       )}
 
       <h2 style={{ marginTop: 32, fontSize: 18 }}>
-        Documents ({(retailer.documents || []).length})
+        Documents ({(partner.documents || []).length})
       </h2>
 
       <div style={{
@@ -141,7 +146,7 @@ export const RetailerDetail: React.FC = () => {
         gap: 16,
         marginTop: 12,
       }}>
-        {(retailer.documents || []).map((doc: Doc) => (
+        {(partner.documents || []).map((doc: Doc) => (
           <DocumentCard
             key={doc.type}
             doc={doc}
@@ -149,15 +154,15 @@ export const RetailerDetail: React.FC = () => {
             onReject={openDocReject}
           />
         ))}
-        {(!retailer.documents || retailer.documents.length === 0) && (
+        {(!partner.documents || partner.documents.length === 0) && (
           <div style={{ color: "#6b7280" }}>No documents uploaded</div>
         )}
       </div>
 
       <div style={{ marginTop: 32, display: "flex", gap: 12 }}>
         <button
-          disabled={busy || retailer.status === "APPROVED"}
-          onClick={approveStore}
+          disabled={busy || vs === "APPROVED"}
+          onClick={approvePartner}
           style={{
             padding: "10px 20px",
             background: "#16a34a",
@@ -169,10 +174,10 @@ export const RetailerDetail: React.FC = () => {
             cursor: "pointer",
           }}
         >
-          Approve Store
+          Approve Partner
         </button>
         <button
-          disabled={busy || retailer.status === "REJECTED"}
+          disabled={busy || vs === "REJECTED"}
           onClick={() => setRejectOpen(true)}
           style={{
             padding: "10px 20px",
@@ -185,15 +190,15 @@ export const RetailerDetail: React.FC = () => {
             cursor: "pointer",
           }}
         >
-          Reject Store
+          Reject Partner
         </button>
       </div>
 
       <RejectModal
-        title="Reject Retailer"
+        title="Reject Delivery Partner"
         open={rejectOpen}
         onClose={() => setRejectOpen(false)}
-        onConfirm={rejectStore}
+        onConfirm={rejectPartner}
       />
       <RejectModal
         title={"Reject Document: " + (docReject || "")}
@@ -205,4 +210,4 @@ export const RetailerDetail: React.FC = () => {
   );
 };
 
-export default RetailerDetail;
+export default DeliveryPartnerDetail;

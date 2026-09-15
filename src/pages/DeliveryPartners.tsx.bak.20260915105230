@@ -1,14 +1,14 @@
 ﻿import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { axiosClient as api } from "../api/axiosClient";
+import api from "../lib/api";
 
-interface Retailer {
+interface Partner {
   _id: string;
-  shopName: string;
-  phone: string;
-  email?: string;
-  ownerId?: { name?: string; mobile?: string };
-  status: "PENDING" | "APPROVED" | "REJECTED" | "SUSPENDED";
+  userId?: { name?: string; mobile?: string };
+  vehicleType: string;
+  vehicleNumber: string;
+  verificationStatus: "PENDING" | "APPROVED" | "REJECTED" | "SUSPENDED";
+  documents?: any[];
   createdAt: string;
 }
 
@@ -37,9 +37,9 @@ const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
   );
 };
 
-export const Retailers: React.FC = () => {
-  const [retailers, setRetailers] = useState<Retailer[]>([]);
-  const [filter, setFilter] = useState<string>("ALL");
+export const DeliveryPartners: React.FC = () => {
+  const [partners, setPartners] = useState<Partner[]>([]);
+  const [filter, setFilter] = useState<string>("PENDING");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -48,38 +48,28 @@ export const Retailers: React.FC = () => {
       setLoading(true);
       setError(null);
       const params: any = { limit: 100 };
-      if (filter !== "ALL") params.status = filter;
-
-      const res = await api.get("/admin/retailers", { params });
-
+      if (filter !== "ALL") params.verificationStatus = filter;
+      const res = await api.get("/admin/delivery-partners", { params });
       const outer = res.data?.data;
-      let list: Retailer[] = [];
-      if (Array.isArray(outer)) {
-        list = outer;
-      } else if (outer && Array.isArray(outer.retailers)) {
-        list = outer.retailers;
-      }
-
-      console.log("[Retailers] Response shape:", outer);
-      console.log("[Retailers] Loaded", list.length, "retailers");
-      setRetailers(list);
+      const list = Array.isArray(outer?.deliveryPartners)
+        ? outer.deliveryPartners
+        : Array.isArray(outer)
+          ? outer
+          : [];
+      setPartners(list);
     } catch (e: any) {
-      console.error("[Retailers] Error:", e);
       setError(e?.response?.data?.error?.message || e.message);
-      setRetailers([]);
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    load();
-  }, [filter]);
+  useEffect(() => { load(); }, [filter]);
 
   return (
     <div style={{ padding: 24, fontFamily: "system-ui, sans-serif" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <h1 style={{ margin: 0, fontSize: 24 }}>Retailers</h1>
+        <h1 style={{ margin: 0, fontSize: 24 }}>Delivery Partners</h1>
         <button
           onClick={load}
           disabled={loading}
@@ -92,7 +82,7 @@ export const Retailers: React.FC = () => {
             fontSize: 13,
           }}
         >
-          {loading ? "Loading..." : "Refresh"}
+          Refresh
         </button>
       </div>
 
@@ -127,43 +117,31 @@ export const Retailers: React.FC = () => {
         <table style={{ width: "100%", borderCollapse: "collapse" }}>
           <thead style={{ background: "#f9fafb" }}>
             <tr>
-              <th style={{ padding: 12, textAlign: "left", fontSize: 12, color: "#6b7280" }}>Shop</th>
-              <th style={{ padding: 12, textAlign: "left", fontSize: 12, color: "#6b7280" }}>Owner</th>
+              <th style={{ padding: 12, textAlign: "left", fontSize: 12, color: "#6b7280" }}>Name</th>
               <th style={{ padding: 12, textAlign: "left", fontSize: 12, color: "#6b7280" }}>Mobile</th>
+              <th style={{ padding: 12, textAlign: "left", fontSize: 12, color: "#6b7280" }}>Vehicle</th>
+              <th style={{ padding: 12, textAlign: "left", fontSize: 12, color: "#6b7280" }}>Docs</th>
               <th style={{ padding: 12, textAlign: "left", fontSize: 12, color: "#6b7280" }}>Status</th>
-              <th style={{ padding: 12, textAlign: "left", fontSize: 12, color: "#6b7280" }}>Registered</th>
               <th style={{ padding: 12, textAlign: "right", fontSize: 12, color: "#6b7280" }}>Actions</th>
             </tr>
           </thead>
           <tbody>
-            {loading && retailers.length === 0 && (
-              <tr>
-                <td colSpan={6} style={{ padding: 24, textAlign: "center", color: "#6b7280" }}>
-                  Loading...
-                </td>
-              </tr>
+            {loading && partners.length === 0 && (
+              <tr><td colSpan={6} style={{ padding: 24, textAlign: "center", color: "#6b7280" }}>Loading...</td></tr>
             )}
-            {!loading && retailers.length === 0 && (
-              <tr>
-                <td colSpan={6} style={{ padding: 24, textAlign: "center", color: "#6b7280" }}>
-                  No retailers found
-                </td>
-              </tr>
+            {!loading && partners.length === 0 && (
+              <tr><td colSpan={6} style={{ padding: 24, textAlign: "center", color: "#6b7280" }}>No delivery partners found</td></tr>
             )}
-            {retailers.map((r) => (
-              <tr key={r._id} style={{ borderTop: "1px solid #f3f4f6" }}>
-                <td style={{ padding: 12, fontWeight: 600 }}>{r.shopName}</td>
-                <td style={{ padding: 12 }}>{r.ownerId?.name || "-"}</td>
-                <td style={{ padding: 12 }}>{r.phone || r.ownerId?.mobile || "-"}</td>
-                <td style={{ padding: 12 }}>
-                  <StatusBadge status={r.status} />
-                </td>
-                <td style={{ padding: 12, fontSize: 12, color: "#6b7280" }}>
-                  {new Date(r.createdAt).toLocaleDateString()}
-                </td>
+            {partners.map((p) => (
+              <tr key={p._id} style={{ borderTop: "1px solid #f3f4f6" }}>
+                <td style={{ padding: 12, fontWeight: 600 }}>{p.userId?.name || "-"}</td>
+                <td style={{ padding: 12 }}>{p.userId?.mobile || "-"}</td>
+                <td style={{ padding: 12 }}>{p.vehicleType} · {p.vehicleNumber}</td>
+                <td style={{ padding: 12 }}>{p.documents?.length || 0}</td>
+                <td style={{ padding: 12 }}><StatusBadge status={p.verificationStatus} /></td>
                 <td style={{ padding: 12, textAlign: "right" }}>
                   <Link
-                    to={"/retailers/" + r._id}
+                    to={`/delivery-partners/${p._id}`}
                     style={{
                       padding: "6px 12px",
                       background: "#2563eb",
@@ -186,4 +164,4 @@ export const Retailers: React.FC = () => {
   );
 };
 
-export default Retailers;
+export default DeliveryPartners;
